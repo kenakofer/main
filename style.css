@@ -1,0 +1,25 @@
+#network-container {
+            width: 100%;
+            height: 800px;
+            border: 1px solid #ccc;
+        }
+        .controls {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .tooltip {
+            position: absolute;
+            background: #fff;
+            border: 1px solid #ccc;
+            padding: 8px;
+            border-radius: 4px;
+            pointer-events: none;
+            display: none;
+            max-width: 300px;
+        }
