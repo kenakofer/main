@@ -7769,11 +7769,11 @@
             "minPower": 0,
             "maxPower": 1
         },
-        "Recipe_Alternate_EnrichedCoal_C": {
+        "Recipe_EnrichedCoal_C": {
             "slug": "recipe-alternate-enrichedcoal-c",
             "name": "Alternate: Compacted Coal",
-            "className": "Recipe_Alternate_EnrichedCoal_C",
-            "alternate": true,
+            "className": "Recipe_EnrichedCoal_C",
+            "alternate": false,
             "time": 12.0,
             "inHand": false,
             "forBuilding": false,
@@ -35663,7 +35663,7 @@
             ],
             "unlock": {
                 "recipes": [
-                    "Recipe_Alternate_EnrichedCoal_C"
+                    "Recipe_EnrichedCoal_C"
                 ],
                 "scannerResources": [],
                 "inventorySlots": 0,
