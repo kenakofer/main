@@ -1,16 +1,27 @@
-$(document).ready(async function() {
+$(document).ready(async function () {
     // Use a relative URL when running locally (file:) and remote URL when served from webserver
     const dataUrl = "data/data1.0.json"
 
     const { items, recipes } = await $.getJSON(dataUrl);
-    
+
     // Filter items and recipes
     const filteredItems = Object.values(items).filter(item => item.stackSize !== 1);
-    const filteredRecipes = Object.values(recipes).filter(recipe => 
+    const filteredRecipes = Object.values(recipes).filter(recipe =>
         !recipe.alternate && recipe.inMachine && recipe.products
     );
-    // Print the filtered recipes json
-    // console.log("Filtered recipes:", JSON.stringify(filteredRecipes, null, 2));
+
+    // Define default visibility states
+    const itemConfigs = [
+        { className: 'Desc_SAMIngot_C', default: false },
+    ];
+
+    // Create lookup for default visibility (defaulting to true if not specified)
+    const defaultVisibility = Object.fromEntries(
+        filteredItems.map(item => [
+            item.className,
+            itemConfigs.find(c => c.className === item.className)?.default ?? true
+        ])
+    );
 
     // Calculate complexity for each item
     const itemComplexity = {};
@@ -22,7 +33,7 @@ $(document).ready(async function() {
 
     // Set of items to manually set 0 complexity
     const zeroComplexityItems = new Set([
-        'Desc_OreCopper_C', 'Desc_OreIron_C', 'Desc_Stone_C', 
+        'Desc_OreCopper_C', 'Desc_OreIron_C', 'Desc_Stone_C',
         'Desc_OreUranium_C', 'Desc_Coal_C', 'Desc_OreGold_C',
         'Desc_LiquidOil_C', 'Desc_Water_C', 'Desc_NitrogenGas_C'
     ]);
@@ -32,12 +43,12 @@ $(document).ready(async function() {
         console.log(`Checking item ${item.className} (${item.name})`);
         // Debugging: for Desc_OreIron_C, print out what it's a product of
         if (item.className === 'Desc_OreIron_C') {
-            const recipesForItem = filteredRecipes.filter(recipe => 
+            const recipesForItem = filteredRecipes.filter(recipe =>
                 recipe.products.some(product => product.item === item.className)
             );
             console.log(`Recipes for Desc_OreIron_C: ${recipesForItem.map(r => r.name).join(', ')}`);
         }
-        
+
         if (zeroComplexityItems.has(item.className) || !filteredRecipes.some(recipe => recipe.products.some(product => product.item === item.className))) {
             itemComplexity[item.className] = 0;
             unassignedItems.delete(item.className);
@@ -53,7 +64,7 @@ $(document).ready(async function() {
         const newlyAssigned = new Set();
 
         unassignedItems.forEach(itemClass => {
-            if (filteredRecipes.some(recipe => 
+            if (filteredRecipes.some(recipe =>
                 recipe.products.some(product => product.item === itemClass) &&
                 recipe.ingredients.every(ingredient => assignedItems.has(ingredient.item))
             )) {
@@ -89,7 +100,9 @@ $(document).ready(async function() {
         image: `https://www.satisfactorytools.com/assets/images/items/${item.icon}_64.png`,
         shape: 'image',
         myTitle: `<b>${item.name}</b><br>${item.description}`,
-        complexity: itemComplexity[item.className]
+        complexity: itemComplexity[item.className],
+        hidden: !defaultVisibility[item.className],
+        physics: defaultVisibility[item.className]
     })));
 
     // Create edges
@@ -120,7 +133,7 @@ $(document).ready(async function() {
                         id: `undirected-${edgeIdCounter++}`,
                         from: ingredients[i],
                         to: ingredients[j],
-                        dashes: [5,5],
+                        dashes: [5, 5],
                         color: '#007bff',
                         myTitle: `<b>${recipe.name}</b><br>Produced in: ${recipe.producedIn.join(', ')}`,
                         physics: false
@@ -133,7 +146,7 @@ $(document).ready(async function() {
     // Network configuration
     const container = document.getElementById('network-container');
     const data = { nodes, edges: new vis.DataSet(edges) };
-    
+
     const options = {
         nodes: {
             borderWidth: 1,
@@ -161,8 +174,50 @@ $(document).ready(async function() {
 
     const network = new vis.Network(container, data, options);
 
+    // Create item checkboxes
+    const itemCheckboxesContainer = $('#item-checkboxes');
+    itemConfigs
+        .forEach(config => {
+            const item = filteredItems.find(i => i.className === config.className);
+            if (!item) return;
+
+            const checkboxId = `item-${config.className}`;
+            const isChecked = config.default;
+            const checkbox = $(`
+                <div class="item-checkbox">
+                    <input type="checkbox" id="${checkboxId}" ${isChecked ? 'checked' : ''}>
+                    <label for="${checkboxId}">${item.name}</label>
+                </div>
+            `);
+            itemCheckboxesContainer.append(checkbox);
+
+            // Add change handler
+            $(`#${checkboxId}`).change(function () {
+                const show = this.checked;
+                nodes.update({
+                    id: item.className,
+                    hidden: !show,
+                    physics: show
+                });
+
+                // Update connected edges
+                const connectedEdges = edges.filter(edge =>
+                    edge.from === item.className || edge.to === item.className
+                );
+                data.edges.update(connectedEdges.map(edge => ({
+                    id: edge.id,
+                    hidden: !show ||
+                        nodes.get(edge.from).hidden ||
+                        nodes.get(edge.to).hidden,
+                    physics: show &&
+                        !nodes.get(edge.from).hidden &&
+                        !nodes.get(edge.to).hidden
+                })));
+            });
+        });
+
     // Control handlers (fixed version)
-    $('#showUndirected').change(function() {
+    $('#showUndirected').change(function () {
         const show = this.checked;
         data.edges.update(
             edges
@@ -175,13 +230,13 @@ $(document).ready(async function() {
         );
     });
 
-    $('#hideIsolated').change(function() {
+    $('#hideIsolated').change(function () {
         const hide = this.checked;
         const allEdges = edges.filter(e => !e.hidden);
         const connectedNodes = new Set(
             allEdges.flatMap(e => [e.from, e.to])
         );
-        
+
         nodes.update(nodes.get().map(node => ({
             ...node,
             hidden: hide && !connectedNodes.has(node.id),
@@ -189,7 +244,7 @@ $(document).ready(async function() {
         })));
     });
 
-    $('#maxComplexity').change(function() {
+    $('#maxComplexity').change(function () {
         const maxComplexity = parseInt(this.value, 13);
         nodes.update(nodes.get().map(node => ({
             ...node,
@@ -217,7 +272,7 @@ $(document).ready(async function() {
         tooltip.innerHTML = node.myTitle;
         tooltip.style.display = 'block';
     });
-    
+
     network.on("hoverEdge", e => {
         const edge = data.edges.get(e.edge); // Use data.edges.get to retrieve the edge
         if (!edge) {
