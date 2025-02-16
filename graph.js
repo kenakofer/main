@@ -169,7 +169,8 @@ $(document).ready(async function() {
                 .filter(edge => edge.dashes)
                 .map(edge => ({
                     id: edge.id,
-                    hidden: !show
+                    hidden: !show,
+                    physics: show  // Only enable physics when shown
                 }))
         );
     });
@@ -183,7 +184,8 @@ $(document).ready(async function() {
         
         nodes.update(nodes.get().map(node => ({
             ...node,
-            hidden: hide && !connectedNodes.has(node.id)
+            hidden: hide && !connectedNodes.has(node.id),
+            physics: !(hide && !connectedNodes.has(node.id))  // Only enable physics when shown
         })));
     });
 
@@ -191,8 +193,21 @@ $(document).ready(async function() {
         const maxComplexity = parseInt(this.value, 13);
         nodes.update(nodes.get().map(node => ({
             ...node,
-            hidden: node.complexity > maxComplexity
+            hidden: node.complexity > maxComplexity,
+            physics: node.complexity <= maxComplexity  // Only enable physics when shown
         })));
+
+        // Also update edges connected to hidden nodes
+        data.edges.update(edges.map(edge => {
+            const fromNode = nodes.get(edge.from);
+            const toNode = nodes.get(edge.to);
+            const isHidden = fromNode.hidden || toNode.hidden;
+            return {
+                id: edge.id,
+                hidden: isHidden,
+                physics: !isHidden  // Only enable physics when shown
+            };
+        }));
     });
 
     // Tooltip handling
