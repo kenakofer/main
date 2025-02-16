@@ -204,7 +204,7 @@ $(document).ready(async function() {
     });
     
     network.on("hoverEdge", e => {
-        const edge = edges[e.edge];
+        const edge = data.edges.get(e.edge); // Use data.edges.get to retrieve the edge
         if (!edge) {
             console.warn("Edge not found:", e.edge);
             return;
