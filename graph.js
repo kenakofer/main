@@ -88,7 +88,7 @@ $(document).ready(async function() {
         label: item.name,
         image: `https://www.satisfactorytools.com/assets/images/items/${item.icon}_64.png`,
         shape: 'image',
-        title: `<b>${item.name}</b><br>${item.description}`,
+        myTitle: `<b>${item.name}</b><br>${item.description}`,
         complexity: itemComplexity[item.className]
     })));
 
@@ -106,7 +106,7 @@ $(document).ready(async function() {
                     to: product.item,
                     arrows: 'to',
                     color: '#28a745',
-                    title: `<b>${recipe.name}</b><br>Produced in: ${recipe.producedIn.join(', ')}`
+                    myTitle: `<b>${recipe.name}</b><br>Produced in: ${recipe.producedIn.join(', ')}`
                 });
             });
         });
@@ -122,7 +122,7 @@ $(document).ready(async function() {
                         to: ingredients[j],
                         dashes: [5,5],
                         color: '#007bff',
-                        title: `<b>${recipe.name}</b><br>Produced in: ${recipe.producedIn.join(', ')}`,
+                        myTitle: `<b>${recipe.name}</b><br>Produced in: ${recipe.producedIn.join(', ')}`,
                         physics: false
                     });
                 }
@@ -156,7 +156,6 @@ $(document).ready(async function() {
         },
         interaction: {
             hover: true,
-            tooltipDelay: 100
         }
     };
 
@@ -200,7 +199,7 @@ $(document).ready(async function() {
     const tooltip = document.getElementById('tooltip');
     network.on("hoverNode", e => {
         const node = nodes.get(e.node);
-        tooltip.innerHTML = node.title;
+        tooltip.innerHTML = node.myTitle;
         tooltip.style.display = 'block';
     });
     
@@ -210,7 +209,7 @@ $(document).ready(async function() {
             console.warn("Edge not found:", e.edge);
             return;
         }
-        tooltip.innerHTML = edge.title;
+        tooltip.innerHTML = edge.myTitle;
         tooltip.style.display = 'block';
     });
 
