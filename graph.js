@@ -5,9 +5,15 @@ $(document).ready(async function () {
     const { items, recipes } = await $.getJSON(dataUrl);
 
     // Filter items and recipes
-    const filteredItems = Object.values(items).filter(item => item.stackSize !== 1);
+    const filteredItems = Object.values(items).filter(item => 
+        item.stackSize !== 1 &&
+        // Name doesn't start with "Packaged "
+        item.name.indexOf("Packaged ") !== 0
+    );
     const filteredRecipes = Object.values(recipes).filter(recipe =>
-        !recipe.alternate && recipe.inMachine && recipe.products
+        !recipe.alternate && recipe.inMachine && recipe.products &&
+        !recipe.producedIn.every(machine => 
+            machine === 'Desc_Converter_C' || machine === 'Desc_Packager_C')
     );
 
     // Define default visibility states
@@ -115,6 +121,12 @@ $(document).ready(async function () {
         // Directed edges (ingredients -> products)
         recipe.products.forEach(product => {
             recipe.ingredients.forEach(ingredient => {
+                // Check that the ingredient and product exist in the filtered items
+                if (!filteredItems.some(item => item.className === ingredient.item) ||
+                    !filteredItems.some(item => item.className === product.item)) {
+                    console.warn(`Skipping edge creation for non-existent items: ${ingredient.item} or ${product.item}`);
+                    return
+                }
                 edges.push({
                     id: `directed-${edgeIdCounter++}`,
                     from: ingredient.item,
@@ -131,6 +143,10 @@ $(document).ready(async function () {
             const ingredients = recipe.ingredients.map(i => i.item);
             for (let i = 0; i < ingredients.length; i++) {
                 for (let j = i + 1; j < ingredients.length; j++) {
+                    if (!filteredItems.some(item => item.className === ingredients[i]) ||
+                        !filteredItems.some(item => item.className === ingredients[j])) {
+                        continue;
+                    }
                     edges.push({
                         id: `undirected-${edgeIdCounter++}`,
                         from: ingredients[i],
