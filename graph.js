@@ -151,9 +151,18 @@ $(document).ready(async function () {
     const Graph = ForceGraph3D()(container)
         .graphData({ nodes: nodesArray, links: edges.map(e => ({ ...e, source: e.from, target: e.to })) })
         .nodeAutoColorBy('complexity')
-        .nodeVal(node => {
-            // Smaller complexity (closer relationship) gives larger value
-            return node.hidden ? 1 : Math.max(5 - node.complexity, 1);
+        .nodeThreeObject(node => {
+            // Use a texture loader with crossOrigin enabled
+            const textureLoader = new THREE.TextureLoader().setCrossOrigin('anonymous');
+            const imgTexture = textureLoader.load(node.image);
+            const spriteMaterial = new THREE.SpriteMaterial({
+                map: imgTexture,
+                depthTest: false,
+                depthWrite: false
+            });
+            const sprite = new THREE.Sprite(spriteMaterial);
+            sprite.scale.set(30, 30, 1);
+            return sprite;
         })
         .linkWidth(1)
         .backgroundColor('#222')
