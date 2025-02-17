@@ -141,27 +141,6 @@ $(document).ready(async function () {
             });
         });
 
-        // Undirected co-ingredient edges
-        if (recipe.ingredients.length > 1) {
-            const ingredients = recipe.ingredients.map(i => i.item);
-            for (let i = 0; i < ingredients.length; i++) {
-                for (let j = i + 1; j < ingredients.length; j++) {
-                    if (!filteredItems.some(item => item.className === ingredients[i]) ||
-                        !filteredItems.some(item => item.className === ingredients[j])) {
-                        continue;
-                    }
-                    edges.push({
-                        id: `undirected-${edgeIdCounter++}`,
-                        from: ingredients[i],
-                        to: ingredients[j],
-                        dashes: [5, 5],
-                        color: '#007bff',
-                        myTitle: `<b>${recipe.name}</b><br>Produced in: ${recipe.producedIn.join(', ')}`,
-                        physics: false
-                    });
-                }
-            }
-        }
     });
 
     // Instead of vis.Network, use ForceGraph3D for a 3D graph
