@@ -1,18 +1,19 @@
 $(document).ready(async function () {
     // Use a relative URL when running locally (file:) and remote URL when served from webserver
-    const dataUrl = "data/data1.0.json"
+    const dataUrl = "data/data1.0.json";
 
+    // Fetch data from JSON
     const { items, recipes } = await $.getJSON(dataUrl);
 
     // Filter items and recipes
-    const filteredItems = Object.values(items).filter(item => 
+    const filteredItems = Object.values(items).filter(item =>
         item.stackSize !== 1 &&
         // Name doesn't start with "Packaged "
         item.name.indexOf("Packaged ") !== 0
     );
     const filteredRecipes = Object.values(recipes).filter(recipe =>
         !recipe.alternate && recipe.inMachine && recipe.products &&
-        !recipe.producedIn.every(machine => 
+        !recipe.producedIn.every(machine =>
             machine === 'Desc_Converter_C' || machine === 'Desc_Packager_C')
     );
 
@@ -37,7 +38,9 @@ $(document).ready(async function () {
     const assignedItems = new Set();
 
     // Initialize all items with complexity 13
-    filteredItems.forEach(item => itemComplexity[item.className] = 13);
+    filteredItems.forEach(item => {
+        itemComplexity[item.className] = 13;
+    });
 
     // Set of items to manually set 0 complexity
     const zeroComplexityItems = new Set([
@@ -63,7 +66,6 @@ $(document).ready(async function () {
             assignedItems.add(item.className);
             console.log(`Assigned complexity 0 to item ${item.className}`);
         }
-
     });
 
     let currentComplexity = 1;
@@ -101,8 +103,8 @@ $(document).ready(async function () {
         currentComplexity++;
     }
 
-    // Create nodes with complexity
-    const nodes = new vis.DataSet(filteredItems.map(item => ({
+    // Create nodes with complexity using vis.DataSet, then extract plain arrays for 3D rendering
+    const visNodes = new vis.DataSet(filteredItems.map(item => ({
         id: item.className,
         label: item.name,
         image: `https://www.satisfactorytools.com/assets/images/items/${item.icon}_64.png`,
@@ -112,8 +114,9 @@ $(document).ready(async function () {
         hidden: !defaultVisibility[item.className],
         physics: defaultVisibility[item.className]
     })));
+    const nodesArray = visNodes.get();
 
-    // Create edges
+    // Create edges as plain objects
     const edges = [];
     let edgeIdCounter = 0;
 
@@ -125,7 +128,7 @@ $(document).ready(async function () {
                 if (!filteredItems.some(item => item.className === ingredient.item) ||
                     !filteredItems.some(item => item.className === product.item)) {
                     console.warn(`Skipping edge creation for non-existent items: ${ingredient.item} or ${product.item}`);
-                    return
+                    return;
                 }
                 edges.push({
                     id: `directed-${edgeIdCounter++}`,
@@ -161,34 +164,44 @@ $(document).ready(async function () {
         }
     });
 
-    // Network configuration
+    // Instead of vis.Network, use ForceGraph3D for a 3D graph
     const container = document.getElementById('network-container');
-    const data = { nodes, edges: new vis.DataSet(edges) };
+    // Create a tooltip element in HTML with id="tooltip" for hover display if not already present
+    const tooltip = document.getElementById('tooltip');
 
-    const options = {
-        nodes: {
-            borderWidth: 1,
-            size: 32,
-            font: { size: 14 },
-            shadow: true
-        },
-        edges: {
-            smooth: false,
-            width: 2,
-            selectionWidth: 3
-        },
-        physics: {
-            stabilization: true,
-            barnesHut: {
-                gravitationalConstant: -2000,
-                springLength: 200,
-                springConstant: 0.04
+    const Graph = ForceGraph3D()(container)
+        .graphData({ nodes: nodesArray, links: edges.map(e => ({ ...e, source: e.from, target: e.to })) })
+        .nodeAutoColorBy('complexity')
+        .nodeVal(node => {
+            // Smaller complexity (closer relationship) gives larger value
+            return node.hidden ? 1 : Math.max(5 - node.complexity, 1);
+        })
+        .linkWidth(1)
+        .backgroundColor('#222')
+        .onNodeHover(node => {
+            if (node) {
+                tooltip.innerHTML = node.myTitle;
+                tooltip.style.display = 'block';
+            } else {
+                tooltip.style.display = 'none';
             }
-        },
-        interaction: {
-            hover: true,
-        }
-    };
+        })
+        .onLinkHover(link => {
+            if (link) {
+                tooltip.innerHTML = link.myTitle;
+                tooltip.style.display = 'block';
+            } else {
+                tooltip.style.display = 'none';
+            }
+        });
+
+    // Helper function to update the graph with transformed links
+    function refreshGraph() {
+        Graph.graphData({
+            nodes: nodesArray,
+            links: edges.map(e => ({ ...e, source: e.from, target: e.to }))
+        });
+    }
 
     // Create item checkboxes - Moved BEFORE network event triggers
     const itemCheckboxesContainer = $('#item-checkboxes');
@@ -207,137 +220,72 @@ $(document).ready(async function () {
         $(`#${checkboxId}`).change(function () {
             console.log(`Checkbox ${checkboxId} changed to ${this.checked}`);
             const show = this.checked;
-            nodes.update({
-                id: item.className,
-                hidden: !show,
-                physics: show
-            });
+            // Update the node's hidden and physics flags in nodesArray
+            const node = nodesArray.find(n => n.id === item.className);
+            if (node) {
+                node.hidden = !show;
+            }
             console.log(`Updated node ${item.className} to hidden: ${!show}`);
-            console.log(`Node data:`, nodes.get(item.className));
-            const connectedEdges = edges.filter(edge =>
-                edge.from === item.className || edge.to === item.className
-            );
-            data.edges.update(connectedEdges.map(edge => ({
-                id: edge.id,
-                hidden: !show ||
-                    nodes.get(edge.from).hidden ||
-                    nodes.get(edge.to).hidden,
-                physics: show &&
-                    !nodes.get(edge.from).hidden &&
-                    !nodes.get(edge.to).hidden
-            })));
+            refreshGraph();
         });
     });
 
-    // Network initialization remains unchanged
-    window.network = new vis.Network(container, data, options);
-
-    // Wait for network stabilization before triggering checkbox events
-    network.once('stabilizationIterationsDone', () => {
-        triggerAllCheckboxes();
-    });
-
-    // Helper function to trigger all checkboxes
-    function triggerAllCheckboxes() {
-        // Works out here
-        ['showUndirected', 'hideIsolated', 'maxComplexity']
-            .forEach(id => $(`#${id}`).trigger('change'));
-
-        console.log("Manually Triggering checkbox for item-Desc_SAMIngot_C");
-
-        // For some extremely weird reason, the initial call to trigger the checkbox
-        // will only update the network if it comes after the other checkbox triggers
-        for (let i = 0; i < itemConfigs.length; i++) {
-            const config = itemConfigs[i];
-            const checkboxId = `item-${config.className}`;
-            console.log(`Triggering checkbox for ${checkboxId}`);
-            // log the jquery object to see if it exists
-            // console.log($(`#${checkboxId}`));
-            $(`#${checkboxId}`).trigger('change');
-            // $('#item-Desc_SAMIngot_C').trigger('change')
-        }
-    }
-    // Expose the function to the global scope for debugging
-    window.triggerAllCheckboxes = triggerAllCheckboxes;
-
-    // Control handlers (fixed version)
+    // Control handlers: update edges and nodes for checkboxes controlling graph view
     $('#showUndirected').change(function () {
         const show = this.checked;
-        data.edges.update(
-            edges
-                .filter(edge => edge.dashes)
-                .map(edge => ({
-                    id: edge.id,
-                    hidden: !show,
-                    physics: show  // Only enable physics when shown
-                }))
-        );
+        edges.forEach(edge => {
+            if (edge.dashes) {
+                edge.hidden = !show;
+                edge.physics = show;  // Only enable physics when shown
+            }
+        });
+        refreshGraph();
     });
 
     $('#hideIsolated').change(function () {
         const hide = this.checked;
-        const allEdges = edges.filter(e => !e.hidden);
-        const connectedNodes = new Set(
-            allEdges.flatMap(e => [e.from, e.to])
-        );
-
-        nodes.update(nodes.get().map(node => ({
-            ...node,
-            hidden: hide && !connectedNodes.has(node.id),
-            physics: !(hide && !connectedNodes.has(node.id))  // Only enable physics when shown
-        })));
+        const connectedNodes = new Set();
+        edges.forEach(edge => {
+            if (!edge.hidden) {
+                connectedNodes.add(edge.from);
+                connectedNodes.add(edge.to);
+            }
+        });
+        nodesArray.forEach(node => {
+            node.hidden = hide && !connectedNodes.has(node.id);
+            node.physics = !(hide && !connectedNodes.has(node.id));
+        });
+        refreshGraph();
     });
 
     $('#maxComplexity').change(function () {
-        const maxComplexity = parseInt(this.value, 13);
-        nodes.update(nodes.get().map(node => ({
-            ...node,
-            hidden: node.complexity > maxComplexity,
-            physics: node.complexity <= maxComplexity  // Only enable physics when shown
-        })));
-
-        // Also update edges connected to hidden nodes
-        data.edges.update(edges.map(edge => {
-            const fromNode = nodes.get(edge.from);
-            const toNode = nodes.get(edge.to);
-            const isHidden = fromNode.hidden || toNode.hidden;
-            return {
-                id: edge.id,
-                hidden: isHidden,
-                physics: !isHidden  // Only enable physics when shown
-            };
-        }));
+        const maxComplexity = parseInt(this.value, 10);
+        nodesArray.forEach(node => {
+            node.hidden = node.complexity > maxComplexity;
+            node.physics = node.complexity <= maxComplexity;
+        });
+        // Update edges connected to hidden nodes
+        edges.forEach(edge => {
+            const fromNode = nodesArray.find(n => n.id === edge.from);
+            const toNode = nodesArray.find(n => n.id === edge.to);
+            const isHidden = (fromNode ? fromNode.hidden : false) || (toNode ? toNode.hidden : false);
+            edge.hidden = isHidden;
+            edge.physics = !isHidden;
+        });
+        refreshGraph();
     });
 
-    // After all checkbox handlers are set up, trigger their change events
-    // Only trigger control checkbox handlers
+    // Trigger control checkbox events initially
     $('#showUndirected').trigger('change');
     $('#hideIsolated').trigger('change');
     $('#maxComplexity').trigger('change');
 
-    // Tooltip handling
-    const tooltip = document.getElementById('tooltip');
-    network.on("hoverNode", e => {
-        const node = nodes.get(e.node);
-        tooltip.innerHTML = node.myTitle;
-        tooltip.style.display = 'block';
-    });
-
-    network.on("hoverEdge", e => {
-        const edge = data.edges.get(e.edge); // Use data.edges.get to retrieve the edge
-        if (!edge) {
-            console.warn("Edge not found:", e.edge);
-            return;
-        }
-        tooltip.innerHTML = edge.myTitle;
-        tooltip.style.display = 'block';
-    });
-
-    network.on("blurNode", () => tooltip.style.display = 'none');
-    network.on("blurEdge", () => tooltip.style.display = 'none');
-
+    // Handle tooltip repositioning on mouse movement
     document.addEventListener('mousemove', e => {
         tooltip.style.left = `${e.pageX + 10}px`;
         tooltip.style.top = `${e.pageY + 10}px`;
     });
+
+    // Expose the graph instance for debugging if needed
+    window.Graph3D = Graph;
 });
