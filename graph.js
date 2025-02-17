@@ -172,49 +172,76 @@ $(document).ready(async function () {
         }
     };
 
-    const network = new vis.Network(container, data, options);
-
-    // Create item checkboxes
+    // Create item checkboxes - Moved BEFORE network event triggers
     const itemCheckboxesContainer = $('#item-checkboxes');
-    itemConfigs
-        .forEach(config => {
-            const item = filteredItems.find(i => i.className === config.className);
-            if (!item) return;
-
-            const checkboxId = `item-${config.className}`;
-            const isChecked = config.default;
-            const checkbox = $(`
-                <div class="item-checkbox">
-                    <input type="checkbox" id="${checkboxId}" ${isChecked ? 'checked' : ''}>
-                    <label for="${checkboxId}">${item.name}</label>
-                </div>
-            `);
-            itemCheckboxesContainer.append(checkbox);
-
-            // Add change handler
-            $(`#${checkboxId}`).change(function () {
-                const show = this.checked;
-                nodes.update({
-                    id: item.className,
-                    hidden: !show,
-                    physics: show
-                });
-
-                // Update connected edges
-                const connectedEdges = edges.filter(edge =>
-                    edge.from === item.className || edge.to === item.className
-                );
-                data.edges.update(connectedEdges.map(edge => ({
-                    id: edge.id,
-                    hidden: !show ||
-                        nodes.get(edge.from).hidden ||
-                        nodes.get(edge.to).hidden,
-                    physics: show &&
-                        !nodes.get(edge.from).hidden &&
-                        !nodes.get(edge.to).hidden
-                })));
+    itemConfigs.forEach(config => {
+        const item = filteredItems.find(i => i.className === config.className);
+        if (!item) return;
+        const checkboxId = `item-${config.className}`;
+        const isChecked = config.default;
+        const checkbox = $(`
+            <div class="item-checkbox">
+                <input type="checkbox" id="${checkboxId}" ${isChecked ? 'checked' : ''}>
+                <label for="${checkboxId}">${item.name}</label>
+            </div>
+        `);
+        itemCheckboxesContainer.append(checkbox);
+        $(`#${checkboxId}`).change(function () {
+            console.log(`Checkbox ${checkboxId} changed to ${this.checked}`);
+            const show = this.checked;
+            nodes.update({
+                id: item.className,
+                hidden: !show,
+                physics: show
             });
+            console.log(`Updated node ${item.className} to hidden: ${!show}`);
+            console.log(`Node data:`, nodes.get(item.className));
+            const connectedEdges = edges.filter(edge =>
+                edge.from === item.className || edge.to === item.className
+            );
+            data.edges.update(connectedEdges.map(edge => ({
+                id: edge.id,
+                hidden: !show ||
+                    nodes.get(edge.from).hidden ||
+                    nodes.get(edge.to).hidden,
+                physics: show &&
+                    !nodes.get(edge.from).hidden &&
+                    !nodes.get(edge.to).hidden
+            })));
+            window.network.redraw();
         });
+    });
+
+    // Network initialization remains unchanged
+    window.network = new vis.Network(container, data, options);
+
+    // Wait for network stabilization before triggering checkbox events
+    network.once('stabilizationIterationsDone', () => {
+        triggerAllCheckboxes();
+    });
+
+    // Helper function to trigger all checkboxes
+    function triggerAllCheckboxes() {
+        // Works out here
+        ['showUndirected', 'hideIsolated', 'maxComplexity']
+            .forEach(id => $(`#${id}`).trigger('change'));
+
+        console.log("Manually Triggering checkbox for item-Desc_SAMIngot_C");
+
+        // For some extremely weird reason, the initial call to trigger the checkbox
+        // will only update the network if it comes after the other checkbox triggers
+        for (let i = 0; i < itemConfigs.length; i++) {
+            const config = itemConfigs[i];
+            const checkboxId = `item-${config.className}`;
+            console.log(`Triggering checkbox for ${checkboxId}`);
+            // log the jquery object to see if it exists
+            // console.log($(`#${checkboxId}`));
+            $(`#${checkboxId}`).trigger('change');
+            // $('#item-Desc_SAMIngot_C').trigger('change')
+        }
+    }
+    // Expose the function to the global scope for debugging
+    window.triggerAllCheckboxes = triggerAllCheckboxes;
 
     // Control handlers (fixed version)
     $('#showUndirected').change(function () {
@@ -264,6 +291,12 @@ $(document).ready(async function () {
             };
         }));
     });
+
+    // After all checkbox handlers are set up, trigger their change events
+    // Only trigger control checkbox handlers
+    $('#showUndirected').trigger('change');
+    $('#hideIsolated').trigger('change');
+    $('#maxComplexity').trigger('change');
 
     // Tooltip handling
     const tooltip = document.getElementById('tooltip');

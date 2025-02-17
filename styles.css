@@ -1,0 +1,14 @@
+#item-controls {
+    margin-top: 20px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.item-checkbox {
+    margin: 5px 0;
+    white-space: nowrap;
+}
+
+.item-checkbox label {
+    margin-left: 5px;
+}
