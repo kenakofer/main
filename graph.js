@@ -13,6 +13,8 @@ $(document).ready(async function () {
     // Define default visibility states
     const itemConfigs = [
         { className: 'Desc_SAMIngot_C', default: false },
+        { className: 'Desc_Water_C', default: false },
+        { className: 'Desc_Coal_C', default: false },
     ];
 
     // Create lookup for default visibility (defaulting to true if not specified)
@@ -208,7 +210,6 @@ $(document).ready(async function () {
                     !nodes.get(edge.from).hidden &&
                     !nodes.get(edge.to).hidden
             })));
-            window.network.redraw();
         });
     });
 
