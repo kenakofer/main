@@ -107,7 +107,7 @@ $(document).ready(async function () {
     const visNodes = new vis.DataSet(filteredItems.map(item => ({
         id: item.className,
         label: item.name,
-        image: `https://www.satisfactorytools.com/assets/images/items/${item.icon}_64.png`,
+        image: `img/${item.icon}_64.png`,
         shape: 'image',
         myTitle: `<b>${item.name}</b><br>${item.description}`,
         complexity: itemComplexity[item.className],
